@@ -1,0 +1,128 @@
+################################################################################
+# DataX — ADIS16470 IMU on NVIDIA AGX Orin  (custom JetPack 7.2.1 / L4T r39.2.1)
+#
+# An OS-IMAGE build (like the `kuiper` target): CiM orchestrates fetch + workspace
+# + make targets, and the real build is the NVIDIA L4T BSP flow driven by our
+# effort repo (=y ADIS16475 driver + baked DT node + MB1 pinmux, then flash).
+#
+# Effort repo : https://github.com/Carlosjr-Jones_adi/datax-orin
+# Host prereqs: Linux/WSL2 x86_64, ~40 GB disk, sudo, qemu-user-static + binfmt.
+#               (Cross-build is x86_64-host → aarch64; not an aarch64-host build.)
+#
+# ⚠ FIRST-CUT DRAFT — validate with `cim makefile` then inspect the generated
+#   Makefile before `make`. Likely iteration points are marked  TODO / NOTE.
+#   In Make recipes: CiM expands ${{ VAR }} → $(VAR); shell vars need $$ .
+################################################################################
+
+variables:
+  # Resolved relative to the CiM workspace root ( ${{ WORKSPACE }} = ~/dsdk-jetson-orin-datax ).
+  L4T_DIR:   ${{ WORKSPACE }}/Linux_for_Tegra
+  TOOLCHAIN: ${{ WORKSPACE }}/x-tools/aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-
+  BUILDER:   ${{ WORKSPACE }}/datax-orin/datax-image-builder
+  BOARD:     jetson-agx-orin-devkit
+
+################################################################################
+# Cross toolchain — crosstool-NG 1.26.0 gcc 13.2.0 (aarch64-none-linux-gnu-).
+# Shipped in the L4T r38 release, reused for r39 (same as bootstrap.sh).
+# CiM fetches url/name and extracts to <workspace>/<destination>.
+################################################################################
+toolchains:
+  - name: x-tools.tbz2
+    url: https://developer.nvidia.com/downloads/embedded/L4T/r38_Release_v2.0/release
+    destination: x-tools
+    strip_components: 1          # NOTE: assumes tarball root is `x-tools/`; verify with `tar tf`
+    os: linux
+    arch: x86_64
+    # sha256: <TODO: sha256sum x-tools.tbz2>
+
+################################################################################
+# BSP archives — CiM fetches + caches them (pin sha256 for reproducibility).
+# Extraction + apply_binaries happens in the `stage-bsp` install step (needs sudo).
+################################################################################
+copy_files:
+  - source: https://developer.nvidia.com/downloads/embedded/L4T/r39_Release_v2.1/release/Jetson_Linux_R39.2.1_aarch64.tbz2
+    dest: downloads/Jetson_Linux_R39.2.1_aarch64.tbz2
+    cache: true
+    # sha256: <TODO>
+  - source: https://developer.nvidia.com/downloads/embedded/L4T/r39_Release_v2.1/release/Tegra_Linux_Sample-Root-Filesystem_R39.2.1_aarch64.tbz2
+    dest: downloads/Tegra_Linux_Sample-Root-Filesystem_R39.2.1_aarch64.tbz2
+    cache: true
+    # sha256: <TODO>
+  - source: https://developer.nvidia.com/downloads/embedded/L4T/r39_Release_v2.1/sources/public_sources.tbz2
+    dest: downloads/public_sources.tbz2
+    cache: true
+    # sha256: <TODO>
+
+################################################################################
+# Git — our effort repo (patches + build scripts). PIN to a commit SHA.
+################################################################################
+gits:
+  - name: datax-orin
+    url: https://github.com/Carlosjr-Jones_adi/datax-orin.git
+    commit: master              # TODO: pin to a SHA for reproducible builds (avoid a moving ref)
+
+################################################################################
+# Install steps (idempotent via sentinels) → `make install-<name>`.
+#   stage-bsp            — extract BSP + rootfs + sources, apply_binaries  (L4T Stages A+B)
+#   integrate-adis16470  — apply the device patches                        (per-device; add more later)
+################################################################################
+install:
+  - name: stage-bsp
+    sentinel: .cim/.bsp-staged
+    commands: |
+      @[ -d "${{ WORKSPACE }}/Linux_for_Tegra" ] || tar xf "${{ WORKSPACE }}/downloads/Jetson_Linux_R39.2.1_aarch64.tbz2" -C "${{ WORKSPACE }}"
+      @[ -e "${{ WORKSPACE }}/Linux_for_Tegra/rootfs/etc" ] || sudo tar xpf "${{ WORKSPACE }}/downloads/Tegra_Linux_Sample-Root-Filesystem_R39.2.1_aarch64.tbz2" -C "${{ WORKSPACE }}/Linux_for_Tegra/rootfs/"
+      @cd "${{ WORKSPACE }}/Linux_for_Tegra" && sudo ./tools/l4t_flash_prerequisites.sh || true
+      @cd "${{ WORKSPACE }}/Linux_for_Tegra" && sudo ./apply_binaries.sh
+      @[ -d "${{ WORKSPACE }}/Linux_for_Tegra/source/kernel/kernel-noble" ] || tar xf "${{ WORKSPACE }}/downloads/public_sources.tbz2" -C "${{ WORKSPACE }}"
+      @[ -d "${{ WORKSPACE }}/Linux_for_Tegra/source/kernel/kernel-noble" ] || ( cd "${{ WORKSPACE }}/Linux_for_Tegra/source" && tar xf kernel_src.tbz2 && tar xf kernel_oot_modules_src.tbz2 )
+      @echo "✓ BSP staged (Stages A+B) at ${{ L4T_DIR }}"
+
+  - name: integrate-adis16470
+    sentinel: .cim/.adis16470-integrated
+    depends_on:
+      - stage-bsp
+    commands: |
+      @cd "${{ BUILDER }}" && L4T_DIR="${{ L4T_DIR }}" TOOLCHAIN="${{ TOOLCHAIN }}" bash -c '. ./env.sh && ./apply-changes.sh'
+      @echo "✓ ADIS16470 patches applied (defconfig =y, DT imu@0, MB1 pinmux+gpio, nv-platform spidev evict)"
+
+################################################################################
+# Phase targets → generated Makefile: make sdk-build / sdk-test / sdk-flash / …
+################################################################################
+envsetup:
+  commands: |
+    @echo "=========================================================="
+    @echo "DataX — ADIS16470 on AGX Orin  (JetPack 7.2.1 / L4T r39.2.1)"
+    @echo "=========================================================="
+    @echo "Order of operations:"
+    @echo "  cim install os-deps            # host build deps (apt)"
+    @echo "  cim install toolchains         # fetch + extract x-tools"
+    @echo "  make install-stage-bsp         # extract BSP+rootfs+sources (sudo)"
+    @echo "  make install-integrate-adis16470   # apply device patches"
+    @echo "  make sdk-build                 # kernel + OOT modules + -nv.dtb + rootfs"
+    @echo "  make sdk-test                  # verify-gates.sh"
+    @echo "  make sdk-flash                 # flash the Orin (see notes)"
+
+build:
+  depends_on:
+    - install-integrate-adis16470
+  commands: |
+    @echo "Building custom JetPack image (kernel + OOT modules + -nv.dtb) — this takes a while…"
+    @cd "${{ BUILDER }}" && L4T_DIR="${{ L4T_DIR }}" TOOLCHAIN="${{ TOOLCHAIN }}" bash -c '. ./env.sh && ( cd "$$L4T_DIR/source" && ./nvbuild.sh ) && ./install.sh && ./install-userspace.sh'
+
+test:
+  commands: |
+    @cd "${{ BUILDER }}" && L4T_DIR="${{ L4T_DIR }}" TOOLCHAIN="${{ TOOLCHAIN }}" bash -c '. ./env.sh && ./verify-gates.sh'
+
+flash:
+  commands: |
+    @echo "Flash the Orin (native host, or WSL2 with usbipd --auto-attach):"
+    @echo "  WSL2 only:   sudo systemctl restart systemd-binfmt.service   # else nv-update-initrd: Exec format error"
+    @echo "  Recovery:    put Orin in Force Recovery; usbipd attach --wsl --auto-attach --busid <id>; lsusb | grep 0955"
+    @echo "  Flash eMMC:  cd ${{ L4T_DIR }} && sudo ./flash.sh ${{ BOARD }} internal     # no --erase-all in r39.2.1"
+    @echo "  Verify:      ls /sys/bus/iio/devices ; sudo dmesg | grep -i adis"
+
+clean:
+  commands: |
+    @echo "Cleaning build outputs (keeps the downloads cache + staged BSP)…"
+    @rm -rf "${{ L4T_DIR }}/source/kernel_out" || true

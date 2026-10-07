@@ -1,0 +1,52 @@
+# DataX / AGX Orin — host build dependencies (from datax-orin/bootstrap.sh)
+# Cross-build runs on an x86_64 Linux/WSL2 host (x-tools = x86_64 → aarch64).
+
+# YAML anchor for the reusable package list
+orin_build_packages: &orin_build_packages
+  - build-essential
+  - bc
+  - bison
+  - flex
+  - libssl-dev
+  - libncurses-dev
+  - python3
+  - python3-pip
+  - qemu-user-static        # aarch64 chroot for apply_binaries + nv-update-initrd (flash)
+  - binfmt-support          # binfmt registration (WSL2: also `systemctl restart systemd-binfmt`)
+  - device-tree-compiler    # dtc — verify the baked -nv.dtb
+  - rsync
+  - wget
+  - git
+  - sudo
+
+# Linux x86_64 (Intel/AMD) — the supported build host for this target
+linux-x86_64:
+  ubuntu-26.04:
+    command: "apt-get install"
+    packages: *orin_build_packages
+  ubuntu-24.04:
+    command: "apt-get install"
+    packages: *orin_build_packages
+  ubuntu-22.04:
+    command: "apt-get install"
+    packages: *orin_build_packages
+  debian-12:
+    command: "apt-get install"
+    packages: *orin_build_packages
+
+# Legacy/fallback key (CiM defaults `linux` to x86_64 behavior)
+linux:
+  ubuntu-26.04:
+    command: "apt-get install"
+    packages: *orin_build_packages
+  ubuntu-24.04:
+    command: "apt-get install"
+    packages: *orin_build_packages
+  ubuntu-22.04:
+    command: "apt-get install"
+    packages: *orin_build_packages
+  debian-12:
+    command: "apt-get install"
+    packages: *orin_build_packages
+
+# NOTE: no linux-aarch64 / macos block — this is an x86_64-host cross-build only.
