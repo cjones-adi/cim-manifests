@@ -24,22 +24,27 @@ variables:
 ################################################################################
 # Cross toolchain — crosstool-NG 1.26.0 gcc 13.2.0 (aarch64-none-linux-gnu-).
 # Shipped in the L4T r38 release, reused for r39 (same as bootstrap.sh).
-# CiM fetches url/name and extracts to <workspace>/<destination>.
+#
+# NOT handled via `toolchains:` — CiM's toolchain extractor (toolchain_manager.rs
+# extract_archive) only supports .tar.xz/.txz, .tar.gz/.tgz, .tar, .zip; it has
+# NO bzip2 branch, so `x-tools.tbz2` fails with "Unsupported archive format".
+# A toolchain's `name` drives URL + cache + format detection at once, so there is
+# no name that both downloads as .tbz2 AND extracts. Instead we fetch it as a
+# plain `copy_files` download (below) and untar it in the `stage-toolchain`
+# install step with `tar xf` (which auto-detects bzip2). Also note the archive
+# root is `./x-tools/`, so strip-components must be 2 (not 1) to land the compiler
+# at ${{ TOOLCHAIN }}.  [savepoint: cim bzip2-toolchain limitation]
 ################################################################################
-toolchains:
-  - name: x-tools.tbz2
-    url: https://developer.nvidia.com/downloads/embedded/L4T/r38_Release_v2.0/release
-    destination: x-tools
-    strip_components: 1          # NOTE: assumes tarball root is `x-tools/`; verify with `tar tf`
-    os: linux
-    arch: x86_64
-    # sha256: <TODO: sha256sum x-tools.tbz2>
 
 ################################################################################
-# BSP archives — CiM fetches + caches them (pin sha256 for reproducibility).
-# Extraction + apply_binaries happens in the `stage-bsp` install step (needs sudo).
+# Downloads — CiM fetches + caches them at `cim init` (pin sha256 for repro).
+# BSP archives are extracted in `stage-bsp`; x-tools in `stage-toolchain`.
 ################################################################################
 copy_files:
+  - source: https://developer.nvidia.com/downloads/embedded/L4T/r38_Release_v2.0/release/x-tools.tbz2
+    dest: downloads/x-tools.tbz2
+    cache: true
+    # sha256: <TODO>
   - source: https://developer.nvidia.com/downloads/embedded/L4T/r39_Release_v2.1/release/Jetson_Linux_R39.2.1_aarch64.tbz2
     dest: downloads/Jetson_Linux_R39.2.1_aarch64.tbz2
     cache: true
@@ -63,10 +68,19 @@ gits:
 
 ################################################################################
 # Install steps (idempotent via sentinels) → `make install-<name>`.
+#   stage-toolchain      — untar x-tools (bzip2) → ${{ TOOLCHAIN }}         (replaces `cim install toolchains`)
 #   stage-bsp            — extract BSP + rootfs + sources, apply_binaries  (L4T Stages A+B)
 #   integrate-adis16470  — apply the device patches                        (per-device; add more later)
 ################################################################################
 install:
+  - name: stage-toolchain
+    sentinel: true
+    # x-tools.tbz2 is bzip2; CiM's toolchain extractor can't read it, so we untar
+    # it here (`tar xf` auto-detects bzip2). Archive root is `./x-tools/` → strip 2.
+    commands: |
+      [ -x "${{ TOOLCHAIN }}gcc" ] || { mkdir -p "${{ WORKSPACE }}/x-tools" && tar xf "${{ WORKSPACE }}/downloads/x-tools.tbz2" -C "${{ WORKSPACE }}/x-tools" --strip-components=2; }
+      echo "✓ toolchain staged (crosstool-NG gcc 13.2.0) → ${{ WORKSPACE }}/x-tools"
+
   - name: stage-bsp
     sentinel: .cim/.bsp-staged
     # NOTE: no leading `@` here — CiM folds `install:` commands into one `if/then/else`
@@ -101,7 +115,7 @@ envsetup:
     @echo "=========================================================="
     @echo "Order of operations:"
     @echo "  cim install os-deps            # host build deps (apt)"
-    @echo "  cim install toolchains         # fetch + extract x-tools"
+    @echo "  make install-stage-toolchain   # untar x-tools (bzip2) → TOOLCHAIN"
     @echo "  make install-stage-bsp         # extract BSP+rootfs+sources (sudo)"
     @echo "  make install-integrate-adis16470   # apply device patches"
     @echo "  make sdk-build                 # kernel + OOT modules + -nv.dtb + rootfs"
@@ -110,6 +124,7 @@ envsetup:
 
 build:
   depends_on:
+    - install-stage-toolchain
     - install-integrate-adis16470
   commands: |
     @echo "Building custom JetPack image (kernel + OOT modules + -nv.dtb) — this takes a while…"

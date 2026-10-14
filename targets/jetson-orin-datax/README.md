@@ -15,8 +15,8 @@ is driven by the effort repo **[datax-orin](https://github.com/Carlosjr-Jones_ad
 cim init --source https://github.com/cjones-adi/cim-manifests.git -t jetson-orin-datax
 cd ~/dsdk-jetson-orin-datax
 cim install os-deps                     # host build deps (apt)
-cim install toolchains                  # fetch + extract x-tools
 cim makefile
+make install-stage-toolchain            # untar x-tools (bzip2) → TOOLCHAIN
 make install-stage-bsp                  # extract BSP + rootfs + sources, apply_binaries (sudo)
 make install-integrate-adis16470        # apply the device patches
 make sdk-build                          # kernel + OOT modules + -nv.dtb + rootfs userspace
@@ -25,10 +25,14 @@ make sdk-flash                          # prints the flash recipe (Force Recover
 ```
 
 ## Before first real build — fill these in (`sdk.yml`)
-- **`sha256:`** on the 3 `copy_files` archives and the `x-tools` toolchain (pin for reproducibility).
+- **`sha256:`** on the 4 `copy_files` archives (3 BSP + `x-tools.tbz2`) — pin for reproducibility.
 - ~~**`gits.commit`** — pin `datax-orin` to a SHA instead of `master`.~~ Done — pinned to
   `2f758f1` (2026-10-14). Bump this SHA when datax-orin advances.
-- Verify the `x-tools` `strip_components` against `tar tf x-tools.tbz2` (assumes root is `x-tools/`).
+
+> **Why the toolchain is a `copy_files` download, not a `toolchains:` entry:** `x-tools.tbz2` is bzip2,
+> and CiM's toolchain extractor only handles `.tar.xz/.gz/.tar/.zip` (no bzip2) → "Unsupported archive
+> format". So it's fetched as a plain download and untarred in `make install-stage-toolchain` with
+> `tar xf` (auto-detects bzip2); the archive root is `./x-tools/`, hence `--strip-components=2`.
 
 ## Post-flash provisioning (on the Orin, after `sdk-flash`)
 Two first-boot gotchas the image does **not** handle itself (see datax-orin `IMAGE-BUILD.md` /
