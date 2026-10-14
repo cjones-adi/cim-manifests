@@ -64,7 +64,7 @@ copy_files:
 gits:
   - name: datax-orin
     url: https://github.com/Carlosjr-Jones_adi/datax-orin.git
-    commit: 2f758f118d9682e2227fcb8fc518ae21d2d7b8db   # datax-orin master @ 2026-10-14 (docs: docker/dialout first-boot gap + RTC cold-boot gotcha)
+    commit: 0bbe41e9063fdbbdeb1550e995345a38ef192d82   # datax-orin master @ 2026-10-14 (seeed-h01 carrier profile + CARRIER-aware verify-gates; keep in sync with the -seeed target)
 
 ################################################################################
 # Install steps (idempotent via sentinels) → `make install-<name>`.

@@ -1,4 +1,8 @@
-# jetson-orin-datax — DataX ADIS16470 IMU on AGX Orin
+# jetson-orin-datax — DataX ADIS16470 IMU on the NVIDIA-reference AGX Orin
+
+> **Which carrier?** This target builds for the **NVIDIA-reference AGX Orin devkit**. For the **Seeed Studio
+> H01** carrier, use the sibling target [`jetson-orin-datax-seeed`](../jetson-orin-datax-seeed) instead (same
+> image + a Seeed carrier overlay).
 
 Builds a **custom JetPack 7.2.1 / L4T r39.2.1 image** with the **ADIS16470 IMU baked in over SPI/IIO**
 (`CONFIG_ADIS16475=y` + baked DT node + MB1 pinmux), via the NVIDIA L4T BSP flow. Like the `kuiper`

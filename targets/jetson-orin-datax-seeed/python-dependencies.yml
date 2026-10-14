@@ -1,0 +1,14 @@
+# DataX / AGX Orin — HOST Python dependencies (minimal).
+# libiio + pyadi-iio are baked into the image ROOTFS by install-userspace.sh
+# during sdk-build (target-side), so the host needs almost nothing.
+
+profiles:
+  minimal:
+    packages:
+      - pyyaml
+  dev:
+    packages:
+      - pyyaml
+      - pytest
+
+default: minimal

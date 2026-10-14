@@ -1,0 +1,138 @@
+################################################################################
+# DataX — ADIS16470 IMU on the SEEED STUDIO H01 AGX Orin carrier
+#                                         (custom JetPack 7.2.1 / L4T r39.2.1)
+#
+# Sibling of the `jetson-orin-datax` (NVIDIA-reference devkit) target. SAME image
+# above the board layer — same kernel, rootfs, ADIS16475 =y driver, CAN, ROS/Docker.
+# The ONLY difference is the carrier: after the normal build, a post-build overlay
+# (datax-image-builder/apply-seeed-carrier.sh, CARRIER=seeed-h01) replaces the MB1
+# pinmux/gpio + MB2 BCT + the board -nv.dtb with Seeed's (from the effort repo's
+# boards/seeed-h01/). This reproduces the proven, flashed-and-booted Seeed graft
+# (on-device verified 2026-10-12). See datax-orin docs/CIM-INTEGRATION.md §5.
+#
+# Which image am I building?  → THIS target = Seeed H01.  NVIDIA devkit = jetson-orin-datax.
+#
+# Effort repo : https://github.com/Carlosjr-Jones_adi/datax-orin
+# Host prereqs: Linux/WSL2 x86_64, ~40 GB disk, sudo, qemu-user-static + binfmt.
+################################################################################
+
+variables:
+  # Resolved relative to the CiM workspace root ( ${{ WORKSPACE }} = ~/dsdk-jetson-orin-datax-seeed ).
+  L4T_DIR:   ${{ WORKSPACE }}/Linux_for_Tegra
+  TOOLCHAIN: ${{ WORKSPACE }}/x-tools/aarch64-none-linux-gnu/bin/aarch64-none-linux-gnu-
+  BUILDER:   ${{ WORKSPACE }}/datax-orin/datax-image-builder
+  BOARD:     jetson-agx-orin-devkit   # flash.sh board arg — SAME for both carriers (Seeed's conf symlinks to it).
+                                       # NOT the carrier profile: that is the builder's CARRIER=seeed-h01 env, set in the recipes below.
+
+################################################################################
+# Cross toolchain — bzip2 x-tools.tbz2 fetched via copy_files + untarred in
+# `stage-toolchain` (CiM's toolchain extractor can't read bzip2). See the
+# jetson-orin-datax target / CIM-INTEGRATION.md §5 for the full rationale.
+################################################################################
+
+################################################################################
+# Downloads — CiM fetches + caches at `cim init`. Identical to the NVIDIA target:
+# the Seeed delta is NOT a different BSP — it is our R39.2.1 image + a carrier overlay.
+################################################################################
+copy_files:
+  - source: https://developer.nvidia.com/downloads/embedded/L4T/r38_Release_v2.0/release/x-tools.tbz2
+    dest: downloads/x-tools.tbz2
+    cache: true
+    # sha256: <TODO>
+  - source: https://developer.nvidia.com/downloads/embedded/L4T/r39_Release_v2.1/release/Jetson_Linux_R39.2.1_aarch64.tbz2
+    dest: downloads/Jetson_Linux_R39.2.1_aarch64.tbz2
+    cache: true
+    # sha256: <TODO>
+  - source: https://developer.nvidia.com/downloads/embedded/L4T/r39_Release_v2.1/release/Tegra_Linux_Sample-Root-Filesystem_R39.2.1_aarch64.tbz2
+    dest: downloads/Tegra_Linux_Sample-Root-Filesystem_R39.2.1_aarch64.tbz2
+    cache: true
+    # sha256: <TODO>
+  - source: https://developer.nvidia.com/downloads/embedded/L4T/r39_Release_v2.1/sources/public_sources.tbz2
+    dest: downloads/public_sources.tbz2
+    cache: true
+    # sha256: <TODO>
+
+################################################################################
+# Git — the effort repo (patches + build scripts + boards/seeed-h01/ carrier files).
+################################################################################
+gits:
+  - name: datax-orin
+    url: https://github.com/Carlosjr-Jones_adi/datax-orin.git
+    commit: 0bbe41e9063fdbbdeb1550e995345a38ef192d82   # must be ≥ the commit that adds boards/seeed-h01/ + apply-seeed-carrier.sh; keep in sync with jetson-orin-datax
+
+################################################################################
+# Install steps — IDENTICAL to the NVIDIA target. The carrier differs only at the
+# post-build overlay (in `build` below), so `integrate-adis16470` applies the full
+# patch set (incl. the board DTS imu@0 that install.sh asserts); the Seeed BCT/DTB
+# then overwrite the carrier files afterward.
+################################################################################
+install:
+  - name: stage-toolchain
+    sentinel: true
+    commands: |
+      [ -x "${{ TOOLCHAIN }}gcc" ] || { mkdir -p "${{ WORKSPACE }}/x-tools" && tar xf "${{ WORKSPACE }}/downloads/x-tools.tbz2" -C "${{ WORKSPACE }}/x-tools" --strip-components=2; }
+      echo "✓ toolchain staged (crosstool-NG gcc 13.2.0) → ${{ WORKSPACE }}/x-tools"
+
+  - name: stage-bsp
+    sentinel: .cim/.bsp-staged
+    # No leading `@` — CiM folds install commands into one if/then/else shell block (a leading `@` → literal `@[`/`@cd`).
+    commands: |
+      [ -d "${{ WORKSPACE }}/Linux_for_Tegra" ] || tar xf "${{ WORKSPACE }}/downloads/Jetson_Linux_R39.2.1_aarch64.tbz2" -C "${{ WORKSPACE }}"
+      [ -e "${{ WORKSPACE }}/Linux_for_Tegra/rootfs/etc" ] || sudo tar xpf "${{ WORKSPACE }}/downloads/Tegra_Linux_Sample-Root-Filesystem_R39.2.1_aarch64.tbz2" -C "${{ WORKSPACE }}/Linux_for_Tegra/rootfs/"
+      cd "${{ WORKSPACE }}/Linux_for_Tegra" && sudo ./tools/l4t_flash_prerequisites.sh || true
+      cd "${{ WORKSPACE }}/Linux_for_Tegra" && sudo ./apply_binaries.sh
+      [ -d "${{ WORKSPACE }}/Linux_for_Tegra/source/kernel/kernel-noble" ] || tar xf "${{ WORKSPACE }}/downloads/public_sources.tbz2" -C "${{ WORKSPACE }}"
+      [ -d "${{ WORKSPACE }}/Linux_for_Tegra/source/kernel/kernel-noble" ] || ( cd "${{ WORKSPACE }}/Linux_for_Tegra/source" && tar xf kernel_src.tbz2 && tar xf kernel_oot_modules_src.tbz2 )
+      echo "✓ BSP staged (Stages A+B) at ${{ L4T_DIR }}"
+
+  - name: integrate-adis16470
+    sentinel: .cim/.adis16470-integrated
+    depends_on:
+      - stage-bsp
+    commands: |
+      cd "${{ BUILDER }}" && L4T_DIR="${{ L4T_DIR }}" TOOLCHAIN="${{ TOOLCHAIN }}" bash -c '. ./env.sh && ./apply-changes.sh'
+      echo "✓ ADIS16470 patches applied (carrier patches harmless — Seeed BCT/DTB overlay replaces them post-build)"
+
+################################################################################
+# Phase targets
+################################################################################
+envsetup:
+  commands: |
+    @echo "=========================================================="
+    @echo "DataX — ADIS16470 on the SEEED H01 AGX Orin  (JetPack 7.2.1 / L4T r39.2.1)"
+    @echo "=========================================================="
+    @echo "Carrier = seeed-h01 (sibling of the NVIDIA-ref 'jetson-orin-datax' target)."
+    @echo "Order of operations:"
+    @echo "  cim install os-deps            # host build deps (apt)"
+    @echo "  make install-stage-toolchain   # untar x-tools (bzip2) → TOOLCHAIN"
+    @echo "  make install-stage-bsp         # extract BSP+rootfs+sources (sudo)"
+    @echo "  make install-integrate-adis16470   # apply device patches"
+    @echo "  make sdk-build                 # kernel+modules+userspace+ROS/Docker, THEN Seeed carrier overlay (sudo+net)"
+    @echo "  make sdk-test                  # verify-gates.sh (CARRIER=seeed-h01)"
+    @echo "  make sdk-flash                 # flash the Seeed H01 (see notes)"
+
+build:
+  depends_on:
+    - install-stage-toolchain
+    - install-integrate-adis16470
+  commands: |
+    @echo "Building Seeed H01 image (kernel + OOT modules + rootfs userspace + ROS/Docker), then overlaying the Seeed carrier (MB1/MB2 BCT + DTBs) — long; needs sudo + network…"
+    @cd "${{ BUILDER }}" && L4T_DIR="${{ L4T_DIR }}" TOOLCHAIN="${{ TOOLCHAIN }}" CARRIER="seeed-h01" bash -c '. ./env.sh && ( cd "$$L4T_DIR/source" && ./nvbuild.sh ) && ./install.sh && ./install-userspace.sh && ./install-ros-stack.sh && ./apply-seeed-carrier.sh'
+
+test:
+  commands: |
+    @cd "${{ BUILDER }}" && L4T_DIR="${{ L4T_DIR }}" TOOLCHAIN="${{ TOOLCHAIN }}" CARRIER="seeed-h01" bash -c '. ./env.sh && ./verify-gates.sh'
+
+flash:
+  commands: |
+    @echo "Flash the SEEED H01 (native host, or WSL2 with usbipd):"
+    @echo "  WSL2 only:   sudo systemctl restart systemd-binfmt.service   # else nv-update-initrd: Exec format error"
+    @echo "  WSL2 net:    DISABLE mirrored networking in .wslconfig, else usbipd can't attach the recovery device"
+    @echo "  Recovery:    hold the Seeed board's physical FC-REC button to enter recovery; usbipd attach --wsl --auto-attach --busid <id>; lsusb | grep 0955"
+    @echo "  Flash eMMC:  cd ${{ L4T_DIR }} && sudo ./flash.sh ${{ BOARD }} internal     # same board arg; Seeed conf symlinks to p3737-0000-p3701-0000"
+    @echo "  Verify:      ls /sys/bus/iio/devices ; sudo dmesg | grep -i adis ; ip link show end0   # Seeed on-carrier EQOS/RJ45"
+
+clean:
+  commands: |
+    @echo "Cleaning build outputs (keeps the downloads cache + staged BSP)…"
+    @rm -rf "${{ L4T_DIR }}/source/kernel_out" || true
