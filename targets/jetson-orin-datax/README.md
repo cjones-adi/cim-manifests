@@ -26,8 +26,19 @@ make sdk-flash                          # prints the flash recipe (Force Recover
 
 ## Before first real build — fill these in (`sdk.yml`)
 - **`sha256:`** on the 3 `copy_files` archives and the `x-tools` toolchain (pin for reproducibility).
-- **`gits.commit`** — pin `datax-orin` to a SHA instead of `master`.
+- ~~**`gits.commit`** — pin `datax-orin` to a SHA instead of `master`.~~ Done — pinned to
+  `2f758f1` (2026-10-14). Bump this SHA when datax-orin advances.
 - Verify the `x-tools` `strip_components` against `tar tf x-tools.tbz2` (assumes root is `x-tools/`).
+
+## Post-flash provisioning (on the Orin, after `sdk-flash`)
+Two first-boot gotchas the image does **not** handle itself (see datax-orin `IMAGE-BUILD.md` /
+`docs/PLATFORM-TEST.md` / `docs/ROS2-MOTOR-HANDOFF.md` for the full write-up):
+- **docker/dialout groups** — the image bakes Docker but not the group membership (the login user is
+  created at first boot, after the chroot bake), so `docker` and serial devices (`/dev/ttyCAN`,
+  `/dev/ttyCRSF`) need `sudo` until: `sudo usermod -aG docker,dialout <user>` → log out/in (or `newgrp docker`).
+- **RTC clock** — this Orin's RTC is not battery-backed and loses the clock on every cold boot; a past
+  clock breaks `ros2_canopen` bring-up (surfaces as "error on initialization"). Check `date` first; fix with
+  `sudo timedatectl set-ntp true` (networked) / `fake-hwclock` (offline) / fit the RTC coin cell (permanent).
 
 ## Adding another device (the `integrate <device>` pattern)
 Each device is a new `install:` preset that applies its patch set — e.g. add

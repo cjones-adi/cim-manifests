@@ -59,7 +59,7 @@ copy_files:
 gits:
   - name: datax-orin
     url: https://github.com/Carlosjr-Jones_adi/datax-orin.git
-    commit: master              # TODO: pin to a SHA for reproducible builds (avoid a moving ref)
+    commit: 2f758f118d9682e2227fcb8fc518ae21d2d7b8db   # datax-orin master @ 2026-10-14 (docs: docker/dialout first-boot gap + RTC cold-boot gotcha)
 
 ################################################################################
 # Install steps (idempotent via sentinels) → `make install-<name>`.
@@ -69,22 +69,27 @@ gits:
 install:
   - name: stage-bsp
     sentinel: .cim/.bsp-staged
+    # NOTE: no leading `@` here — CiM folds `install:` commands into one `if/then/else`
+    # shell block joined by ` && `, so a leading `@` would become a literal shell token
+    # (`@[`, `@cd`) and fail. (`@` is only a Make silence prefix on phase-target recipe
+    # lines below, where CiM emits each line as its own recipe line.)
     commands: |
-      @[ -d "${{ WORKSPACE }}/Linux_for_Tegra" ] || tar xf "${{ WORKSPACE }}/downloads/Jetson_Linux_R39.2.1_aarch64.tbz2" -C "${{ WORKSPACE }}"
-      @[ -e "${{ WORKSPACE }}/Linux_for_Tegra/rootfs/etc" ] || sudo tar xpf "${{ WORKSPACE }}/downloads/Tegra_Linux_Sample-Root-Filesystem_R39.2.1_aarch64.tbz2" -C "${{ WORKSPACE }}/Linux_for_Tegra/rootfs/"
-      @cd "${{ WORKSPACE }}/Linux_for_Tegra" && sudo ./tools/l4t_flash_prerequisites.sh || true
-      @cd "${{ WORKSPACE }}/Linux_for_Tegra" && sudo ./apply_binaries.sh
-      @[ -d "${{ WORKSPACE }}/Linux_for_Tegra/source/kernel/kernel-noble" ] || tar xf "${{ WORKSPACE }}/downloads/public_sources.tbz2" -C "${{ WORKSPACE }}"
-      @[ -d "${{ WORKSPACE }}/Linux_for_Tegra/source/kernel/kernel-noble" ] || ( cd "${{ WORKSPACE }}/Linux_for_Tegra/source" && tar xf kernel_src.tbz2 && tar xf kernel_oot_modules_src.tbz2 )
-      @echo "✓ BSP staged (Stages A+B) at ${{ L4T_DIR }}"
+      [ -d "${{ WORKSPACE }}/Linux_for_Tegra" ] || tar xf "${{ WORKSPACE }}/downloads/Jetson_Linux_R39.2.1_aarch64.tbz2" -C "${{ WORKSPACE }}"
+      [ -e "${{ WORKSPACE }}/Linux_for_Tegra/rootfs/etc" ] || sudo tar xpf "${{ WORKSPACE }}/downloads/Tegra_Linux_Sample-Root-Filesystem_R39.2.1_aarch64.tbz2" -C "${{ WORKSPACE }}/Linux_for_Tegra/rootfs/"
+      cd "${{ WORKSPACE }}/Linux_for_Tegra" && sudo ./tools/l4t_flash_prerequisites.sh || true
+      cd "${{ WORKSPACE }}/Linux_for_Tegra" && sudo ./apply_binaries.sh
+      [ -d "${{ WORKSPACE }}/Linux_for_Tegra/source/kernel/kernel-noble" ] || tar xf "${{ WORKSPACE }}/downloads/public_sources.tbz2" -C "${{ WORKSPACE }}"
+      [ -d "${{ WORKSPACE }}/Linux_for_Tegra/source/kernel/kernel-noble" ] || ( cd "${{ WORKSPACE }}/Linux_for_Tegra/source" && tar xf kernel_src.tbz2 && tar xf kernel_oot_modules_src.tbz2 )
+      echo "✓ BSP staged (Stages A+B) at ${{ L4T_DIR }}"
 
   - name: integrate-adis16470
     sentinel: .cim/.adis16470-integrated
     depends_on:
       - stage-bsp
+    # NOTE: no leading `@` — see stage-bsp above (install commands are folded into a shell block).
     commands: |
-      @cd "${{ BUILDER }}" && L4T_DIR="${{ L4T_DIR }}" TOOLCHAIN="${{ TOOLCHAIN }}" bash -c '. ./env.sh && ./apply-changes.sh'
-      @echo "✓ ADIS16470 patches applied (defconfig =y, DT imu@0, MB1 pinmux+gpio, nv-platform spidev evict)"
+      cd "${{ BUILDER }}" && L4T_DIR="${{ L4T_DIR }}" TOOLCHAIN="${{ TOOLCHAIN }}" bash -c '. ./env.sh && ./apply-changes.sh'
+      echo "✓ ADIS16470 patches applied (defconfig =y, DT imu@0, MB1 pinmux+gpio, nv-platform spidev evict)"
 
 ################################################################################
 # Phase targets → generated Makefile: make sdk-build / sdk-test / sdk-flash / …
