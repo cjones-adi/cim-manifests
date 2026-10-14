@@ -102,6 +102,9 @@ envsetup:
     @echo "DataX — ADIS16470 on the SEEED H01 AGX Orin  (JetPack 7.2.1 / L4T r39.2.1)"
     @echo "=========================================================="
     @echo "Carrier = seeed-h01 (sibling of the NVIDIA-ref 'jetson-orin-datax' target)."
+    @echo "WSL2 host note (read before you build): flashing uses usbipd. DEFAULT (NAT) WSL networking is fine —"
+    @echo "  do nothing. ONLY if you deliberately set networking=mirrored in .wslconfig, revert it: mirrored mode"
+    @echo "  blocks usbipd device-attach (so flash can't reach the board) and link-local board reach."
     @echo "Order of operations:"
     @echo "  cim install os-deps            # host build deps (apt)"
     @echo "  make install-stage-toolchain   # untar x-tools (bzip2) → TOOLCHAIN"
@@ -127,7 +130,6 @@ flash:
   commands: |
     @echo "Flash the SEEED H01 (native host, or WSL2 with usbipd):"
     @echo "  WSL2 only:   sudo systemctl restart systemd-binfmt.service   # else nv-update-initrd: Exec format error"
-    @echo "  WSL2 net:    DISABLE mirrored networking in .wslconfig, else usbipd can't attach the recovery device"
     @echo "  Recovery:    hold the Seeed board's physical FC-REC button to enter recovery; usbipd attach --wsl --auto-attach --busid <id>; lsusb | grep 0955"
     @echo "  Flash eMMC:  cd ${{ L4T_DIR }} && sudo ./flash.sh ${{ BOARD }} internal     # same board arg; Seeed conf symlinks to p3737-0000-p3701-0000"
     @echo "  Verify:      ls /sys/bus/iio/devices ; sudo dmesg | grep -i adis ; ip link show end0   # Seeed on-carrier EQOS/RJ45"

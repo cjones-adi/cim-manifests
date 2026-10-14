@@ -18,6 +18,12 @@ replacing the NVIDIA-ref carrier files. Those Seeed DTBs carry Seeed's on-carrie
 `imu@0` + evicted spidev. This reproduces the **proven, flashed-and-booted** Seeed graft (on-device verified
 2026-10-12). Rationale for why it's a file overlay (not `git apply` patches): datax-orin `docs/CIM-INTEGRATION.md` §5.
 
+## Before you start (WSL2 host)
+Flashing later uses `usbipd`. **Default (NAT) WSL networking is fine — do nothing.** Only if you deliberately
+set `networking=mirrored` in `.wslconfig` should you revert it: mirrored mode blocks `usbipd` device-attach and
+link-local board reach (the proven cause of the "can't reach the Seeed" symptom). Worth checking **now**, before
+the long download/build — not at flash time.
+
 ## Usage
 ```bash
 cim init --source https://github.com/cjones-adi/cim-manifests.git -t jetson-orin-datax-seeed
@@ -35,8 +41,8 @@ make sdk-flash                          # prints the flash recipe
 ## Flash notes (Seeed-specific)
 - Same command: `sudo ./flash.sh jetson-agx-orin-devkit internal` (Seeed's conf symlinks to the same config).
 - **Recovery** = the Seeed board's physical **FC-REC** button (not the devkit's).
-- **WSL2**: disable **mirrored networking** in `.wslconfig` or `usbipd` can't attach the recovery device
-  (proven cause of the "can't reach the Seeed" symptom); also `sudo systemctl restart systemd-binfmt.service`.
+- **WSL2**: `sudo systemctl restart systemd-binfmt.service` first (else `nv-update-initrd` fails). (WSL networking:
+  see *Before you start* above — only relevant if you changed it to mirrored.)
 - Verify on-device: `ls /sys/bus/iio/devices` (iio:device0 / PROD_ID 16470), `ip link show end0` (EQOS/RJ45).
 
 ## Notes
