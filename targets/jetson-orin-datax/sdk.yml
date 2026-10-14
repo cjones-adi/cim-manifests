@@ -118,7 +118,7 @@ envsetup:
     @echo "  make install-stage-toolchain   # untar x-tools (bzip2) → TOOLCHAIN"
     @echo "  make install-stage-bsp         # extract BSP+rootfs+sources (sudo)"
     @echo "  make install-integrate-adis16470   # apply device patches"
-    @echo "  make sdk-build                 # kernel + OOT modules + -nv.dtb + rootfs"
+    @echo "  make sdk-build                 # kernel + OOT modules + -nv.dtb + rootfs userspace + ROS/Docker layer (sudo+net)"
     @echo "  make sdk-test                  # verify-gates.sh"
     @echo "  make sdk-flash                 # flash the Orin (see notes)"
 
@@ -127,8 +127,8 @@ build:
     - install-stage-toolchain
     - install-integrate-adis16470
   commands: |
-    @echo "Building custom JetPack image (kernel + OOT modules + -nv.dtb) — this takes a while…"
-    @cd "${{ BUILDER }}" && L4T_DIR="${{ L4T_DIR }}" TOOLCHAIN="${{ TOOLCHAIN }}" bash -c '. ./env.sh && ( cd "$$L4T_DIR/source" && ./nvbuild.sh ) && ./install.sh && ./install-userspace.sh'
+    @echo "Building custom JetPack image (kernel + OOT modules + -nv.dtb + rootfs userspace + ROS/Docker layer) — long; install-userspace + install-ros-stack need sudo + network (aarch64 qemu-chroot)…"
+    @cd "${{ BUILDER }}" && L4T_DIR="${{ L4T_DIR }}" TOOLCHAIN="${{ TOOLCHAIN }}" bash -c '. ./env.sh && ( cd "$$L4T_DIR/source" && ./nvbuild.sh ) && ./install.sh && ./install-userspace.sh && ./install-ros-stack.sh'
 
 test:
   commands: |
