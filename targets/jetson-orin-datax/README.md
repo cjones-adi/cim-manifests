@@ -38,16 +38,15 @@ make sdk-flash                          # prints the flash recipe (Force Recover
 > format". So it's fetched as a plain download and untarred in `make install-stage-toolchain` with
 > `tar xf` (auto-detects bzip2); the archive root is `./x-tools/`, hence `--strip-components=2`.
 
-## First boot
-The image is pre-seeded with a default login user **`analog` / `analog`** (hostname `orin`, autologin) by
-`preseed-user.sh` — like ADI Kuiper ships a default user — so it boots **straight past** NVIDIA's
-`nv-oem-config` setup. Override at build time with `OEM_USER` / `OEM_PASS` / `OEM_HOST`.
+## First boot (turnkey)
+The image is pre-seeded by `preseed-user.sh` — like ADI Kuiper ships a default user — so it boots **straight to
+the desktop**, no NVIDIA `nv-oem-config` setup:
+- default login user **`analog` / `analog`**, hostname `orin`, autologin (override at build with
+  `OEM_USER` / `OEM_PASS` / `OEM_HOST`);
+- that user is already in **`docker`** + **`dialout`**, so `docker` and serial devices (`/dev/ttyCAN`,
+  `/dev/ttyCRSF`) work **without `sudo`** on first boot.
 
 ## Post-flash provisioning (on the Orin, after `sdk-flash`)
-- **docker/dialout groups** — the baked `analog` user is **not yet** in the `docker`/`dialout` groups, so
-  `docker` and serial devices (`/dev/ttyCAN`, `/dev/ttyCRSF`) need `sudo` until:
-  `sudo usermod -aG docker,dialout analog` → log out/in (or `newgrp docker`). *(Now that the user is baked, this
-  could be baked too — see follow-ups.)*
 - **RTC clock** — this Orin's RTC is not battery-backed and loses the clock on every cold boot; a past
   clock breaks `ros2_canopen` bring-up (surfaces as "error on initialization"). Check `date` first; fix with
   `sudo timedatectl set-ntp true` (networked) / `fake-hwclock` (offline) / fit the RTC coin cell (permanent).

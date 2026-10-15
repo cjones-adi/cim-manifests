@@ -58,7 +58,7 @@ copy_files:
 gits:
   - name: datax-orin
     url: https://github.com/Carlosjr-Jones_adi/datax-orin.git
-    commit: bdaf809c54a47377637f6172b3955aeb903b385a   # datax-orin master @ 2026-10-15 (preseed-user.sh — baked default login user); keep both targets in sync
+    commit: 5aa4a5bf83ce1912b0962dce60d0d7ebed97a72f   # datax-orin master @ 2026-10-15 (preseed-user.sh: default user + docker/dialout); keep both targets in sync
 
 ################################################################################
 # Install steps — IDENTICAL to the NVIDIA target. The carrier differs only at the
