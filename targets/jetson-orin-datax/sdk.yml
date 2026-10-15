@@ -64,7 +64,7 @@ copy_files:
 gits:
   - name: datax-orin
     url: https://github.com/Carlosjr-Jones_adi/datax-orin.git
-    commit: 0bbe41e9063fdbbdeb1550e995345a38ef192d82   # datax-orin master @ 2026-10-14 (seeed-h01 carrier profile + CARRIER-aware verify-gates; keep in sync with the -seeed target)
+    commit: bdaf809c54a47377637f6172b3955aeb903b385a   # datax-orin master @ 2026-10-15 (preseed-user.sh — baked default login user); keep both targets in sync
 
 ################################################################################
 # Install steps (idempotent via sentinels) → `make install-<name>`.
@@ -131,7 +131,7 @@ build:
     - install-integrate-adis16470
   commands: |
     @echo "Building custom JetPack image (kernel + OOT modules + -nv.dtb + rootfs userspace + ROS/Docker layer) — long; install-userspace + install-ros-stack need sudo + network (aarch64 qemu-chroot)…"
-    @cd "${{ BUILDER }}" && L4T_DIR="${{ L4T_DIR }}" TOOLCHAIN="${{ TOOLCHAIN }}" bash -c '. ./env.sh && ( cd "$$L4T_DIR/source" && ./nvbuild.sh ) && ./install.sh && ./install-userspace.sh && ./install-ros-stack.sh'
+    @cd "${{ BUILDER }}" && L4T_DIR="${{ L4T_DIR }}" TOOLCHAIN="${{ TOOLCHAIN }}" bash -c '. ./env.sh && ( cd "$$L4T_DIR/source" && ./nvbuild.sh ) && ./install.sh && ./install-userspace.sh && ./install-ros-stack.sh && ./preseed-user.sh'
 
 test:
   commands: |

@@ -46,6 +46,10 @@ make sdk-flash                          # prints the flash recipe
 - Verify on-device: `ls /sys/bus/iio/devices` (iio:device0 / PROD_ID 16470), `ip link show end0` (EQOS/RJ45).
 
 ## Notes
+- **First boot:** pre-seeded with default login user **`analog` / `analog`** (host `orin`, autologin) by
+  `preseed-user.sh` — like ADI Kuiper — so it skips NVIDIA's `nv-oem-config` setup (which otherwise stalls at the
+  username step). Override at build with `OEM_USER` / `OEM_PASS` / `OEM_HOST`. The baked user isn't yet in
+  `docker`/`dialout` — add with `sudo usermod -aG docker,dialout analog` on first boot.
 - The 5 Seeed carrier files live in the effort repo at `datax-image-builder/boards/seeed-h01/` (committed, so a
   cloner gets them). `sha256:` pins on the 4 `copy_files` archives remain the open reproducibility TODO (shared
   with the NVIDIA target).
