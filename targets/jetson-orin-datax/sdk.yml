@@ -144,6 +144,8 @@ flash:
     @echo "  Recovery:    put Orin in Force Recovery; usbipd attach --wsl --auto-attach --busid <id>; lsusb | grep 0955"
     @echo "  Flash eMMC:  cd ${{ L4T_DIR }} && sudo ./flash.sh ${{ BOARD }} internal     # no --erase-all in r39.2.1"
     @echo "  Verify:      ls /sys/bus/iio/devices ; sudo dmesg | grep -i adis"
+    @echo "  Add-device to an EXISTING deployment (preserve APP/userspace): build, then ${{ BUILDER }}/update-device.sh"
+    @echo "    (partition-selective flash of kernel + kernel-dtb + MB1_BCT via flash.sh -k; does NOT rewrite APP)"
 
 clean:
   commands: |

@@ -133,6 +133,8 @@ flash:
     @echo "  Recovery:    hold the Seeed board's physical FC-REC button to enter recovery; usbipd attach --wsl --auto-attach --busid <id>; lsusb | grep 0955"
     @echo "  Flash eMMC:  cd ${{ L4T_DIR }} && sudo ./flash.sh ${{ BOARD }} internal     # same board arg; Seeed conf symlinks to p3737-0000-p3701-0000"
     @echo "  Verify:      ls /sys/bus/iio/devices ; sudo dmesg | grep -i adis ; ip link show end0   # Seeed on-carrier EQOS/RJ45"
+    @echo "  Add-device to an EXISTING deployment (preserve APP/userspace): build (+apply-seeed-carrier), then ${{ BUILDER }}/update-device.sh"
+    @echo "    (partition-selective flash of kernel + kernel-dtb + MB1_BCT via flash.sh -k; does NOT rewrite APP)"
 
 clean:
   commands: |
