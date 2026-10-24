@@ -64,7 +64,7 @@ copy_files:
 gits:
   - name: datax-orin
     url: https://github.com/Carlosjr-Jones_adi/datax-orin.git
-    commit: 5aa4a5bf83ce1912b0962dce60d0d7ebed97a72f   # datax-orin master @ 2026-10-15 (preseed-user.sh: default user + docker/dialout); keep both targets in sync
+    commit: 7dad9b86c9c4804a2fdd87e40c57ee53a248ac86   # datax-orin master @ 2026-10-24 — MUST contain every script the build/test chains call (install-boot-fdt/jetpack-sdk/browsers added after 5aa4a5b); keep both targets in sync
 
 ################################################################################
 # Install steps (idempotent via sentinels) → `make install-<name>`.
