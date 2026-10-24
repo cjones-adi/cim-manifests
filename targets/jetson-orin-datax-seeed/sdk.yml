@@ -120,7 +120,7 @@ build:
     - install-integrate-adis16470
   commands: |
     @echo "Building Seeed H01 image (kernel + OOT modules + rootfs userspace + ROS/Docker + JetPack SDK [CUDA/cuDNN/TensorRT] + Firefox/Chromium), then overlaying the Seeed carrier (MB1/MB2 BCT + DTBs) — long; needs sudo + network + ~15-25 GB disk…"
-    @cd "${{ BUILDER }}" && L4T_DIR="${{ L4T_DIR }}" TOOLCHAIN="${{ TOOLCHAIN }}" CARRIER="seeed-h01" bash -c '. ./env.sh && ( cd "$$L4T_DIR/source" && ./nvbuild.sh ) && ./install.sh && ./install-userspace.sh && ./install-ros-stack.sh && ./install-jetpack-sdk.sh && ./install-browsers.sh && ./preseed-user.sh && ./apply-seeed-carrier.sh'
+    @cd "${{ BUILDER }}" && L4T_DIR="${{ L4T_DIR }}" TOOLCHAIN="${{ TOOLCHAIN }}" CARRIER="seeed-h01" bash -c '. ./env.sh && ( cd "$$L4T_DIR/source" && ./nvbuild.sh ) && ./install.sh && ./install-boot-fdt.sh && ./install-userspace.sh && ./install-ros-stack.sh && ./install-jetpack-sdk.sh && ./install-browsers.sh && ./preseed-user.sh && ./apply-seeed-carrier.sh'
 
 test:
   commands: |

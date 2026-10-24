@@ -131,7 +131,7 @@ build:
     - install-integrate-adis16470
   commands: |
     @echo "Building custom JetPack image (kernel + OOT modules + -nv.dtb + rootfs userspace + ROS/Docker + JetPack SDK components [CUDA/cuDNN/TensorRT/VPI/OpenCV] + Firefox/Chromium) — long; the chroot bakes need sudo + network + ~15-25 GB disk…"
-    @cd "${{ BUILDER }}" && L4T_DIR="${{ L4T_DIR }}" TOOLCHAIN="${{ TOOLCHAIN }}" bash -c '. ./env.sh && ( cd "$$L4T_DIR/source" && ./nvbuild.sh ) && ./install.sh && ./install-userspace.sh && ./install-ros-stack.sh && ./install-jetpack-sdk.sh && ./install-browsers.sh && ./preseed-user.sh'
+    @cd "${{ BUILDER }}" && L4T_DIR="${{ L4T_DIR }}" TOOLCHAIN="${{ TOOLCHAIN }}" bash -c '. ./env.sh && ( cd "$$L4T_DIR/source" && ./nvbuild.sh ) && ./install.sh && ./install-boot-fdt.sh && ./install-userspace.sh && ./install-ros-stack.sh && ./install-jetpack-sdk.sh && ./install-browsers.sh && ./preseed-user.sh'
 
 test:
   commands: |
